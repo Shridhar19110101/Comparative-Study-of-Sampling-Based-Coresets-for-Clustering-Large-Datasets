@@ -44,23 +44,48 @@ def uniform(data,m):
     
     return coreset, weights
 
-def adaptiveSampling(matrixA, matrixC1, c2):
-    # compute the residual
-    matrixQ, matrixR = np.linalg.qr(matrixC1, mode='reduced')
-    matrixQQA = np.dot(matrixQ, np.dot(matrixQ.transpose(), matrixA))
-    matrixRes = matrixA - matrixQQA
-    # compute the sampling probabilites
-    matrixRes = np.square(matrixRes)
-    prob = sum(matrixRes)
-    prob = prob / sum(prob)
-    return np.random.choice(matrixA.shape[0], c2, replace=False, p=prob)
+# adaptive coreset
+def myfunc(e):
+    return e[1]
 
 def adaptive(data,m):
-    N=data.shape[0]
-    N2=int(m/2)
-    index1 = np.random.choice(data.shape[0], N2, replace=False)
-    data1 = data.iloc[index1]
-    index2 = adaptiveSampling(data, data1, m-N2)
-    data2 = data.iloc[index2]
-    data3 = np.concatenate((data1, data2), 0)
-    return data3
+      
+    data1=data
+    b=[]
+
+    # while loop
+    while data1.shape[0]>20:
+        samples=np.random.choice(data1.shape[0],20,replace=False)
+        s=data1.iloc[samples]
+        dist=[]
+        # removing half points
+        for i in range(len(data1)):
+            dist.append(min(np.linalg.norm(s-data1.iloc[i],axis=1)))
+        for ind,val in enumerate(dist):
+            dist[ind]=(ind,val)
+        dist.sort(key=myfunc)
+        data2=[]
+        for i in range(int(len(dist)/2), len(dist)):
+            data2.append(data1.iloc[dist[i][0]])
+        data1=pd.DataFrame(data2)
+        b.extend(np.array(s))
+
+    min_dist=[]
+    b=pd.DataFrame(data=b, columns=data.columns)
+    for i in range(len(data)):
+        min_dist.append(min(np.linalg.norm(b-data.iloc[i],axis=1)**2))
+    suma=sum(min_dist)
+    ma=[]
+    for i in range(len(data)):
+        ma.append(min_dist[i]/suma)
+    pr=[]
+    suma=sum(ma)
+    for i in range(len(data)):
+        pr.append(ma[i]/suma)
+    sample=np.random.choice(data.shape[0],m,replace=False,p=pr)
+    c=data.iloc[sample]
+    weights=[]
+    for sam in sample:
+        weights.append(1/(pr[sam]*m))
+     
+    return c, weights
